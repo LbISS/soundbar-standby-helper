@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Diagnostics;
 
 namespace SoundbarStandbyHelper.TrayManagers;
 
@@ -99,26 +100,30 @@ internal class WindowsTrayManager : ITrayManager
 
 				if (toolStripMenuItemType != null)
 				{
+					var addMethod = items.GetType().GetMethod("Add", new[] { toolStripMenuItemType });
+
 					// Create "Play sound" menu item
 					var playSoundMenuItem = Activator.CreateInstance(toolStripMenuItemType, new object[] { "Play sound" });
 					var playSoundClickEvent = toolStripMenuItemType.GetEvent("Click");
 					playSoundClickEvent?.AddEventHandler(playSoundMenuItem, new EventHandler((s, e) => OnPlaySoundRequested?.Invoke()));
-
-					var addMethod = items.GetType().GetMethod("Add", new[] { toolStripMenuItemType });
 					addMethod?.Invoke(items, new[] { playSoundMenuItem });
 
 					// Create "Restore" menu item
 					var restoreMenuItem = Activator.CreateInstance(toolStripMenuItemType, new object[] { "Restore" });
 					var restoreClickEvent = toolStripMenuItemType.GetEvent("Click");
 					restoreClickEvent?.AddEventHandler(restoreMenuItem, new EventHandler((s, e) => ShowConsoleWindow()));
-
 					addMethod?.Invoke(items, new[] { restoreMenuItem });
+
+					// Create "About" menu item
+					var aboutMenuItem = Activator.CreateInstance(toolStripMenuItemType, new object[] { "About (opens site)" });
+					var aboutClickEvent = toolStripMenuItemType.GetEvent("Click");
+					aboutClickEvent?.AddEventHandler(aboutMenuItem, new EventHandler((s, e) => OpenProjectUrl()));
+					addMethod?.Invoke(items, new[] { aboutMenuItem });
 
 					// Create "Exit" menu item
 					var exitMenuItem = Activator.CreateInstance(toolStripMenuItemType, new object[] { "Exit" });
 					var exitClickEvent = toolStripMenuItemType.GetEvent("Click");
 					exitClickEvent?.AddEventHandler(exitMenuItem, new EventHandler((s, e) => Program.RequestExit()));
-
 					addMethod?.Invoke(items, new[] { exitMenuItem });
 				}
 				else
@@ -162,6 +167,23 @@ internal class WindowsTrayManager : ITrayManager
 
 		// Start window monitoring thread
 		StartWindowMonitoring();
+	}
+
+	private void OpenProjectUrl()
+	{
+		try
+		{
+			// Open the project URL in default browser
+			Process.Start(new ProcessStartInfo
+			{
+				FileName = "https://github.com/LbISS/soundbar-standby-helper",
+				UseShellExecute = true
+			});
+		}
+		catch (Exception ex)
+		{
+			Program.LogMessage($"Error opening website: {ex.Message}");
+		}
 	}
 
 	private void StartWindowMonitoring()
