@@ -63,11 +63,36 @@ internal class WindowsTrayManager : ITrayManager
 
 			if (items != null)
 			{
-				var addMethod = items.GetType().GetMethod("Add", new[] { typeof(string), typeof(object), typeof(EventHandler) });
-				addMethod?.Invoke(items, new object?[] { "Show Console", null, new EventHandler((s, e) => ShowConsoleWindow()) });
-				addMethod?.Invoke(items, new object?[] { "Hide Console", null, new EventHandler((s, e) => HideConsoleWindowInternal()) });
-				addMethod?.Invoke(items, new object?[] { "-", null, null });
-				addMethod?.Invoke(items, new object?[] { "Exit", null, new EventHandler((s, e) => { ShowConsoleWindow(); Program.RequestExit(); }) });
+				// Get the ToolStripMenuItem type
+				var toolStripMenuItemType = Type.GetType("System.Windows.Forms.ToolStripMenuItem, System.Windows.Forms, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089");
+
+				if (toolStripMenuItemType != null)
+				{
+					// Create "Restore" menu item
+					var restoreMenuItem = Activator.CreateInstance(toolStripMenuItemType, new object[] { "Restore" });
+					var restoreClickEvent = toolStripMenuItemType.GetEvent("Click");
+					restoreClickEvent?.AddEventHandler(restoreMenuItem, new EventHandler((s, e) => ShowConsoleWindow()));
+
+					var addMethod = items.GetType().GetMethod("Add", new[] { toolStripMenuItemType });
+					addMethod?.Invoke(items, new[] { restoreMenuItem });
+
+					// Create "Exit" menu item
+					var exitMenuItem = Activator.CreateInstance(toolStripMenuItemType, new object[] { "Exit" });
+					var exitClickEvent = toolStripMenuItemType.GetEvent("Click");
+					exitClickEvent?.AddEventHandler(exitMenuItem, new EventHandler((s, e) => Program.RequestExit()));
+
+					addMethod?.Invoke(items, new[] { exitMenuItem });
+
+					var itemCount = items.GetType().GetProperty("Count")?.GetValue(items);
+				}
+				else
+				{
+					Program.LogMessage("Warning: Could not load ToolStripMenuItem type");
+				}
+			}
+			else
+			{
+				Program.LogMessage("Warning: Could not get context menu items collection");
 			}
 
 			notifyIconType.GetProperty("ContextMenuStrip")?.SetValue(_notifyIcon, contextMenu);
@@ -85,8 +110,6 @@ internal class WindowsTrayManager : ITrayManager
 					mouseDoubleClickEvent.AddEventHandler(_notifyIcon, delegateHandler);
 				}
 			}
-
-			Program.LogMessage("Tray icon created successfully");
 
 			// Create ApplicationContext and run message loop
 			_applicationContext = Activator.CreateInstance(applicationContextType!);
