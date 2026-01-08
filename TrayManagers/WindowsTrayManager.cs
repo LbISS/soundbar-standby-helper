@@ -7,7 +7,6 @@ namespace SoundbarStandbyHelper.TrayManagers;
 internal class WindowsTrayManager : ITrayManager
 {
 	private object? _notifyIcon;
-	private IntPtr _consoleWindow;
 	private bool _disposed;
 	private Thread? _messageLoopThread;
 	private object? _applicationContext;
@@ -19,18 +18,17 @@ internal class WindowsTrayManager : ITrayManager
 
 	public void Initialize(string title, string tooltip, IStartupManager startupManager)
 	{
-		if (!OperatingSystem.IsWindows())
+		if (!OperatingSystem.IsWindows() || !RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
 		{
 			throw new PlatformNotSupportedException("System tray is only supported on Windows.");
 		}
-
-		if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-		{
-			return;
-		}
-
 		_startupManager = startupManager;
-		_consoleWindow = GetConsoleWindow();
+
+		var consoleHwnd = GetConsoleWindow();
+		// This is needed otherwise Windows Terminal on Windows 11 is not working (it's not console anymore)
+		SetForegroundWindow(consoleHwnd);
+		var windowTerminalHandler = GetForegroundWindow();
+		_windowHandlerToUse = windowTerminalHandler != consoleHwnd ? windowTerminalHandler : consoleHwnd;
 
 		// Start a message loop thread for Windows Forms
 		_messageLoopThread = new Thread(() =>
@@ -123,11 +121,11 @@ internal class WindowsTrayManager : ITrayManager
 						var startupMenuItem = Activator.CreateInstance(toolStripMenuItemType, new object[] { "Start with system" });
 						var checkedProperty = toolStripMenuItemType.GetProperty("Checked");
 						var checkOnClickProperty = toolStripMenuItemType.GetProperty("CheckOnClick");
-						
+
 						// Set initial checked state and enable auto-check
 						checkedProperty?.SetValue(startupMenuItem, _startupManager.IsStartupEnabled());
 						checkOnClickProperty?.SetValue(startupMenuItem, true);
-						
+
 						var startupClickEvent = toolStripMenuItemType.GetEvent("Click");
 						startupClickEvent?.AddEventHandler(startupMenuItem, new EventHandler((s, e) =>
 						{
@@ -219,12 +217,12 @@ internal class WindowsTrayManager : ITrayManager
 		{
 			while (_shouldMonitorWindow)
 			{
-				if (_consoleWindow != IntPtr.Zero)
+				if (_windowHandlerToUse != IntPtr.Zero)
 				{
-					if (IsIconic(_consoleWindow))
+					if (IsIconic(_windowHandlerToUse))
 					{
 						// Window is minimized, hide it
-						HideConsoleWindowInternal();
+						HideConsole();
 					}
 				}
 				Thread.Sleep(250); // Check every 250ms
@@ -240,11 +238,11 @@ internal class WindowsTrayManager : ITrayManager
 	[DllImport("user32.dll")]
 	private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
-	[DllImport("user32.dll")]
-	private static extern bool SetForegroundWindow(IntPtr hWnd);
+	[DllImport("user32.dll", CharSet = CharSet.Unicode)]
+	private static extern IntPtr GetForegroundWindow();
 
-	[DllImport("user32.dll")]
-	private static extern bool BringWindowToTop(IntPtr hWnd);
+	[DllImport("user32.dll", CharSet = CharSet.Unicode)]
+	private static extern bool SetForegroundWindow(IntPtr hWnd);
 
 	[DllImport("user32.dll")]
 	private static extern bool IsIconic(IntPtr hWnd);
@@ -252,35 +250,31 @@ internal class WindowsTrayManager : ITrayManager
 	private const int SW_HIDE = 0;
 	private const int SW_RESTORE = 9;
 
+	private bool _isMinimized = false;
+	private nint _windowHandlerToUse = IntPtr.Zero;
+
 	public void HideConsole()
 	{
-		if (OperatingSystem.IsWindows())
+		if (!_isMinimized)
 		{
-			HideConsoleWindowInternal();
-		}
-	}
-
-	private void HideConsoleWindowInternal()
-	{
-		if (_consoleWindow != IntPtr.Zero)
-		{
-			ShowWindow(_consoleWindow, SW_HIDE);
+			_isMinimized = true;
+			ShowWindow(_windowHandlerToUse, SW_HIDE);
 		}
 	}
 
 	private void ShowConsoleWindow()
 	{
-		if (_consoleWindow != IntPtr.Zero)
+		if (_isMinimized)
 		{
-			ShowWindow(_consoleWindow, SW_RESTORE);
-			BringWindowToTop(_consoleWindow);
-			SetForegroundWindow(_consoleWindow);
+			_isMinimized = false;
+			ShowWindow(_windowHandlerToUse, SW_RESTORE);
+			SetForegroundWindow(_windowHandlerToUse);
 		}
 	}
 
 	public void ShowNotification(string title, string message)
 	{
-		if (!OperatingSystem.IsWindows() || _notifyIcon == null)
+		if (_notifyIcon == null)
 			return;
 
 		var notifyIconType = _notifyIcon.GetType();
@@ -295,7 +289,7 @@ internal class WindowsTrayManager : ITrayManager
 
 		_shouldMonitorWindow = false;
 
-		if (_notifyIcon != null && OperatingSystem.IsWindows())
+		if (_notifyIcon != null)
 		{
 			ShowConsoleWindow();
 
