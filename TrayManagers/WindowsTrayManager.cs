@@ -12,6 +12,8 @@ internal class WindowsTrayManager : ITrayManager
 	private Thread? _windowWatchThread;
 	private volatile bool _shouldMonitorWindow;
 
+	public event Action? OnPlaySoundRequested;
+
 	public void Initialize(string title, string tooltip)
 	{
 		if (!OperatingSystem.IsWindows())
@@ -94,25 +96,33 @@ internal class WindowsTrayManager : ITrayManager
 			{
 				// Get the ToolStripMenuItem type
 				var toolStripMenuItemType = Type.GetType("System.Windows.Forms.ToolStripMenuItem, System.Windows.Forms, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089");
-
+				
 				if (toolStripMenuItemType != null)
 				{
+					// Create "Play sound" menu item
+					var playSoundMenuItem = Activator.CreateInstance(toolStripMenuItemType, new object[] { "Play sound" });
+					var playSoundClickEvent = toolStripMenuItemType.GetEvent("Click");
+					playSoundClickEvent?.AddEventHandler(playSoundMenuItem, new EventHandler((s, e) => OnPlaySoundRequested?.Invoke()));
+					
+					var addMethod = items.GetType().GetMethod("Add", new[] { toolStripMenuItemType });
+					addMethod?.Invoke(items, new[] { playSoundMenuItem });
+					
 					// Create "Restore" menu item
 					var restoreMenuItem = Activator.CreateInstance(toolStripMenuItemType, new object[] { "Restore" });
 					var restoreClickEvent = toolStripMenuItemType.GetEvent("Click");
 					restoreClickEvent?.AddEventHandler(restoreMenuItem, new EventHandler((s, e) => ShowConsoleWindow()));
-
-					var addMethod = items.GetType().GetMethod("Add", new[] { toolStripMenuItemType });
+					
 					addMethod?.Invoke(items, new[] { restoreMenuItem });
-
+					
 					// Create "Exit" menu item
 					var exitMenuItem = Activator.CreateInstance(toolStripMenuItemType, new object[] { "Exit" });
 					var exitClickEvent = toolStripMenuItemType.GetEvent("Click");
 					exitClickEvent?.AddEventHandler(exitMenuItem, new EventHandler((s, e) => Program.RequestExit()));
-
+					
 					addMethod?.Invoke(items, new[] { exitMenuItem });
-
+					
 					var itemCount = items.GetType().GetProperty("Count")?.GetValue(items);
+					Program.LogMessage($"Context menu items count: {itemCount}");
 				}
 				else
 				{
@@ -221,6 +231,16 @@ internal class WindowsTrayManager : ITrayManager
 			BringWindowToTop(_consoleWindow);
 			SetForegroundWindow(_consoleWindow);
 		}
+	}
+
+	public void ShowNotification(string title, string message)
+	{
+		if (!OperatingSystem.IsWindows() || _notifyIcon == null)
+			return;
+
+		var notifyIconType = _notifyIcon.GetType();
+		var showBalloonTipMethod = notifyIconType.GetMethod("ShowBalloonTip", new[] { typeof(int), typeof(string), typeof(string), typeof(int) });
+		showBalloonTipMethod?.Invoke(_notifyIcon, new object[] { 3000, title, message, 1 }); // 1 = ToolTipIcon.Info
 	}
 
 	public void Dispose()

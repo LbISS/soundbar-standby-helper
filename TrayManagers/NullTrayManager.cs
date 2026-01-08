@@ -2,6 +2,8 @@ namespace SoundbarStandbyHelper.TrayManagers;
 
 internal class NullTrayManager : ITrayManager
 {
+	public event Action? OnPlaySoundRequested;
+
 	public void Initialize(string title, string tooltip)
 	{
 	}

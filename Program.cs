@@ -28,6 +28,9 @@ ITrayManager trayManager = config.MinimizeToTray && OperatingSystem.IsWindows()
 	? new WindowsTrayManager()
 	: new NullTrayManager();
 
+// Subscribe to play sound event from tray
+trayManager.OnPlaySoundRequested += () => PlaySound(config.SoundFilePath);
+
 if (config.MinimizeToTray)
 {
 	if (OperatingSystem.IsWindows())
