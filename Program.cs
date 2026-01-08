@@ -2,6 +2,7 @@
 using SoundbarStandbyHelper;
 using SoundbarStandbyHelper.AudioPlayers;
 using SoundbarStandbyHelper.TrayManagers;
+using SoundbarStandbyHelper.StartupManagers;
 using System.Runtime.InteropServices;
 
 JsonSerializerOptions jsonOptions = new()
@@ -24,6 +25,19 @@ catch (PlatformNotSupportedException ex)
 	return;
 }
 
+// Create startup manager
+IStartupManager startupManager = StartupManagerFactory.Create();
+
+// Apply startup setting from config
+if (config.StartWithSystem && !startupManager.IsStartupEnabled())
+{
+	startupManager.EnableStartup();
+}
+else if (!config.StartWithSystem && startupManager.IsStartupEnabled())
+{
+	startupManager.DisableStartup();
+}
+
 ITrayManager trayManager = config.MinimizeToTray && OperatingSystem.IsWindows()
 	? new WindowsTrayManager()
 	: new NullTrayManager();
@@ -35,7 +49,7 @@ if (config.MinimizeToTray)
 {
 	if (OperatingSystem.IsWindows())
 	{
-		trayManager.Initialize("Soundbar Standby Helper", "Soundbar Standby Helper - Running");
+		trayManager.Initialize("Soundbar Standby Helper", "Soundbar Standby Helper - Running", startupManager);
 		trayManager.HideConsole();
 	}
 	else

@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Diagnostics;
+using SoundbarStandbyHelper.StartupManagers;
 
 namespace SoundbarStandbyHelper.TrayManagers;
 
@@ -12,10 +13,11 @@ internal class WindowsTrayManager : ITrayManager
 	private object? _applicationContext;
 	private Thread? _windowWatchThread;
 	private volatile bool _shouldMonitorWindow;
+	private IStartupManager? _startupManager;
 
 	public event Action? OnPlaySoundRequested;
 
-	public void Initialize(string title, string tooltip)
+	public void Initialize(string title, string tooltip, IStartupManager startupManager)
 	{
 		if (!OperatingSystem.IsWindows())
 		{
@@ -27,6 +29,7 @@ internal class WindowsTrayManager : ITrayManager
 			return;
 		}
 
+		_startupManager = startupManager;
 		_consoleWindow = GetConsoleWindow();
 
 		// Start a message loop thread for Windows Forms
@@ -113,6 +116,29 @@ internal class WindowsTrayManager : ITrayManager
 					var restoreClickEvent = toolStripMenuItemType.GetEvent("Click");
 					restoreClickEvent?.AddEventHandler(restoreMenuItem, new EventHandler((s, e) => ShowConsoleWindow()));
 					addMethod?.Invoke(items, new[] { restoreMenuItem });
+
+					// Create "Start with system" checkbox menu item (only if supported)
+					if (_startupManager?.IsSupported == true)
+					{
+						var startupMenuItem = Activator.CreateInstance(toolStripMenuItemType, new object[] { "Start with system" });
+						var checkedProperty = toolStripMenuItemType.GetProperty("Checked");
+						var checkOnClickProperty = toolStripMenuItemType.GetProperty("CheckOnClick");
+						
+						// Set initial checked state and enable auto-check
+						checkedProperty?.SetValue(startupMenuItem, _startupManager.IsStartupEnabled());
+						checkOnClickProperty?.SetValue(startupMenuItem, true);
+						
+						var startupClickEvent = toolStripMenuItemType.GetEvent("Click");
+						startupClickEvent?.AddEventHandler(startupMenuItem, new EventHandler((s, e) =>
+						{
+							_startupManager?.ToggleStartup();
+							// Update config
+							var config = ConfigManager.Load("config.json");
+							config.StartWithSystem = _startupManager?.IsStartupEnabled() ?? false;
+							ConfigManager.Save("config.json", config);
+						}));
+						addMethod?.Invoke(items, new[] { startupMenuItem });
+					}
 
 					// Create "About" menu item
 					var aboutMenuItem = Activator.CreateInstance(toolStripMenuItemType, new object[] { "About (opens site)" });

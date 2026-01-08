@@ -20,6 +20,20 @@ internal static class ConfigManager
 		return ReadConfig(configPath);
 	}
 
+	public static void Save(string configPath, AppConfig config)
+	{
+		try
+		{
+			var json = JsonSerializer.Serialize(config, JsonOptions);
+			File.WriteAllText(configPath, json);
+			Program.LogMessage("Configuration saved successfully");
+		}
+		catch (Exception ex)
+		{
+			Program.LogMessage($"Error saving configuration: {ex.Message}");
+		}
+	}
+
 	private static AppConfig ReadConfig(string path)
 	{
 		try

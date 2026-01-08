@@ -1,3 +1,5 @@
+using SoundbarStandbyHelper.StartupManagers;
+
 namespace SoundbarStandbyHelper.TrayManagers;
 
 internal class NullTrayManager : ITrayManager
@@ -6,7 +8,7 @@ internal class NullTrayManager : ITrayManager
 	public event Action? OnPlaySoundRequested;
 #pragma warning restore CS0067
 
-	public void Initialize(string title, string tooltip)
+	public void Initialize(string title, string tooltip, IStartupManager startupManager)
 	{
 	}
 
