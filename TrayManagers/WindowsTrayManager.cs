@@ -1,16 +1,15 @@
-#if WINDOWS
-using System.Drawing;
-using System.Windows.Forms;
-#endif
+using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace SoundbarStandbyHelper.TrayManagers;
 
 internal class WindowsTrayManager : ITrayManager
 {
-#if WINDOWS
-	private NotifyIcon? _notifyIcon;
-#endif
+	private object? _notifyIcon;
+	private IntPtr _consoleWindow;
 	private bool _disposed;
+	private Thread? _messageLoopThread;
+	private object? _applicationContext;
 
 	public void Initialize(string title, string tooltip)
 	{
@@ -19,36 +18,144 @@ internal class WindowsTrayManager : ITrayManager
 			throw new PlatformNotSupportedException("System tray is only supported on Windows.");
 		}
 
-#if WINDOWS
-		_notifyIcon = new NotifyIcon
+		if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
 		{
-			Icon = SystemIcons.Application,
-			Text = tooltip,
-			Visible = true
-		};
+			return;
+		}
 
-		var contextMenu = new ContextMenuStrip();
-		contextMenu.Items.Add("Exit", null, (s, e) =>
+		_consoleWindow = GetConsoleWindow();
+
+		// Start a message loop thread for Windows Forms
+		_messageLoopThread = new Thread(() =>
 		{
-			Program.RequestExit();
+			var applicationType = Type.GetType("System.Windows.Forms.Application, System.Windows.Forms, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089");
+			var applicationContextType = Type.GetType("System.Windows.Forms.ApplicationContext, System.Windows.Forms, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089");
+			
+			if (applicationType == null || applicationContextType == null)
+			{
+				Program.LogMessage("Warning: Windows Forms types not available.");
+				return;
+			}
+
+			// Create NotifyIcon on the UI thread
+			var notifyIconType = Type.GetType("System.Windows.Forms.NotifyIcon, System.Windows.Forms, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089");
+			if (notifyIconType == null)
+			{
+				Program.LogMessage("Warning: System.Windows.Forms.NotifyIcon not available.");
+				return;
+			}
+
+			_notifyIcon = Activator.CreateInstance(notifyIconType);
+			
+			var systemIconsType = Type.GetType("System.Drawing.SystemIcons, System.Drawing.Common, Version=8.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51");
+			var applicationIcon = systemIconsType?.GetProperty("Application", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)?.GetValue(null);
+			
+			notifyIconType.GetProperty("Icon")?.SetValue(_notifyIcon, applicationIcon);
+			notifyIconType.GetProperty("Text")?.SetValue(_notifyIcon, tooltip);
+			notifyIconType.GetProperty("Visible")?.SetValue(_notifyIcon, true);
+
+			var contextMenuStripType = Type.GetType("System.Windows.Forms.ContextMenuStrip, System.Windows.Forms, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089");
+			var contextMenu = Activator.CreateInstance(contextMenuStripType!);
+			
+			var itemsProperty = contextMenuStripType!.GetProperty("Items");
+			var items = itemsProperty?.GetValue(contextMenu);
+			
+			if (items != null)
+			{
+				var addMethod = items.GetType().GetMethod("Add", new[] { typeof(string), typeof(object), typeof(EventHandler) });
+				addMethod?.Invoke(items, new object?[] { "Show Console", null, new EventHandler((s, e) => ShowConsoleWindow()) });
+				addMethod?.Invoke(items, new object?[] { "Hide Console", null, new EventHandler((s, e) => HideConsoleWindowInternal()) });
+				addMethod?.Invoke(items, new object?[] { "-", null, null });
+				addMethod?.Invoke(items, new object?[] { "Exit", null, new EventHandler((s, e) => { ShowConsoleWindow(); Program.RequestExit(); }) });
+			}
+
+			notifyIconType.GetProperty("ContextMenuStrip")?.SetValue(_notifyIcon, contextMenu);
+
+			// Use MouseDoubleClick event with proper handler
+			var mouseDoubleClickEvent = notifyIconType.GetEvent("MouseDoubleClick");
+			if (mouseDoubleClickEvent != null)
+			{
+				var mouseEventHandlerType = Type.GetType("System.Windows.Forms.MouseEventHandler, System.Windows.Forms, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089");
+				if (mouseEventHandlerType != null)
+				{
+					// Create a delegate that matches MouseEventHandler signature: void (object sender, MouseEventArgs e)
+					var handler = new Action<object?, object?>((sender, e) => ShowConsoleWindow());
+					var delegateHandler = Delegate.CreateDelegate(mouseEventHandlerType, handler.Target, handler.Method);
+					mouseDoubleClickEvent.AddEventHandler(_notifyIcon, delegateHandler);
+				}
+			}
+
+			Program.LogMessage("Tray icon created successfully");
+
+			// Create ApplicationContext and run message loop
+			_applicationContext = Activator.CreateInstance(applicationContextType!);
+			var runMethod = applicationType.GetMethod("Run", new[] { applicationContextType });
+			runMethod?.Invoke(null, new[] { _applicationContext });
 		});
 
-		_notifyIcon.ContextMenuStrip = contextMenu;
-		_notifyIcon.DoubleClick += (s, e) =>
+		_messageLoopThread.SetApartmentState(ApartmentState.STA);
+		_messageLoopThread.IsBackground = true;
+		_messageLoopThread.Start();
+
+		// Give the thread time to initialize
+		Thread.Sleep(100);
+	}
+
+	public void OnMouseDoubleClick(object? sender, object? e)
+	{
+		ShowConsoleWindow();
+	}
+
+	[DllImport("kernel32.dll")]
+	private static extern IntPtr GetConsoleWindow();
+
+	[DllImport("user32.dll")]
+	private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+	[DllImport("user32.dll")]
+	private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+	[DllImport("user32.dll")]
+	private static extern bool BringWindowToTop(IntPtr hWnd);
+
+	private const int SW_HIDE = 0;
+	private const int SW_SHOW = 5;
+	private const int SW_RESTORE = 9;
+
+	public void HideConsole()
+	{
+		if (OperatingSystem.IsWindows())
 		{
-			ShowNotification(title, "Application is running in system tray");
-		};
-#endif
+			HideConsoleWindowInternal();
+		}
+	}
+
+	private void HideConsoleWindowInternal()
+	{
+		if (_consoleWindow != IntPtr.Zero)
+		{
+			ShowWindow(_consoleWindow, SW_HIDE);
+		}
+	}
+
+	private void ShowConsoleWindow()
+	{
+		if (_consoleWindow != IntPtr.Zero)
+		{
+			ShowWindow(_consoleWindow, SW_RESTORE);
+			BringWindowToTop(_consoleWindow);
+			SetForegroundWindow(_consoleWindow);
+		}
 	}
 
 	public void ShowNotification(string title, string message)
 	{
-#if WINDOWS
-		if (_notifyIcon == null)
+		if (!OperatingSystem.IsWindows() || _notifyIcon == null)
 			return;
 
-		_notifyIcon.ShowBalloonTip(3000, title, message, ToolTipIcon.Info);
-#endif
+		var notifyIconType = _notifyIcon.GetType();
+		var showBalloonTipMethod = notifyIconType.GetMethod("ShowBalloonTip", new[] { typeof(int), typeof(string), typeof(string), typeof(int) });
+		showBalloonTipMethod?.Invoke(_notifyIcon, new object[] { 3000, title, message, 1 }); // 1 = ToolTipIcon.Info
 	}
 
 	public void Dispose()
@@ -56,13 +163,23 @@ internal class WindowsTrayManager : ITrayManager
 		if (_disposed)
 			return;
 
-#if WINDOWS
-		if (_notifyIcon != null)
+		if (_notifyIcon != null && OperatingSystem.IsWindows())
 		{
-			_notifyIcon.Visible = false;
-			_notifyIcon.Dispose();
+			ShowConsoleWindow();
+			
+			var notifyIconType = _notifyIcon.GetType();
+			notifyIconType.GetProperty("Visible")?.SetValue(_notifyIcon, false);
+			
+			var disposeMethod = notifyIconType.GetMethod("Dispose");
+			disposeMethod?.Invoke(_notifyIcon, null);
 		}
-#endif
+
+		if (_applicationContext != null)
+		{
+			var applicationType = Type.GetType("System.Windows.Forms.Application, System.Windows.Forms, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089");
+			var exitThreadMethod = applicationType?.GetMethod("ExitThread");
+			exitThreadMethod?.Invoke(null, null);
+		}
 
 		_disposed = true;
 	}

@@ -33,8 +33,8 @@ if (config.MinimizeToTray)
 	if (OperatingSystem.IsWindows())
 	{
 		trayManager.Initialize("Sound Timer", "Sound Timer - Running");
-		Program.LogMessage("Application minimized to system tray");
-		trayManager.ShowNotification("Sound Timer", "Application is running in system tray. Right-click tray icon to exit.");
+		trayManager.ShowNotification("Sound Timer", "Application is running in system tray.");
+		trayManager.HideConsole();
 	}
 	else
 	{
@@ -42,9 +42,7 @@ if (config.MinimizeToTray)
 	}
 }
 
-Program.LogMessage($"Sound Timer Started");
-Program.LogMessage($"Sound file: {config.SoundFilePath}");
-Program.LogMessage($"Sound will play every {config.DelaySeconds} seconds...");
+Program.LogMessage($"Sound Timer Started, the sound will play every {config.DelaySeconds} seconds...");
 Program.LogMessage("Press Ctrl+C to exit.");
 Console.WriteLine();
 

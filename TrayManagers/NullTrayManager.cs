@@ -10,6 +10,10 @@ internal class NullTrayManager : ITrayManager
 	{
 	}
 
+	public void HideConsole()
+	{
+	}
+
 	public void Dispose()
 	{
 	}
