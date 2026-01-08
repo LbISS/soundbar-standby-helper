@@ -15,6 +15,7 @@ internal static class ConfigManager
 		{
 			Program.LogMessage($"Configuration file '{configPath}' not found. Creating default config...");
 			CreateDefault(configPath);
+			Program.LogMessage("Configuration saved successfully");
 		}
 
 		return ReadConfig(configPath);

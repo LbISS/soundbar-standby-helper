@@ -1,6 +1,10 @@
 @echo off
 setlocal enabledelayedexpansion
 
+:: Check for --debug flag
+set DEBUG_MODE=0
+if /I "%1"=="--debug" set DEBUG_MODE=1
+
 echo ============================================
 echo  Soundbar Standby Helper - Release Builder
 echo ============================================
@@ -32,6 +36,9 @@ if exist publish rd /s /q publish
 if exist releases rd /s /q releases
 mkdir publish
 mkdir releases
+
+:: Skip self-contained builds in debug mode
+if %DEBUG_MODE%==1 goto :SkipSelfContained
 
 echo.
 echo ============================================
@@ -72,10 +79,16 @@ if errorlevel 1 (
     exit /b 1
 )
 
+:SkipSelfContained
+
 echo.
 echo ============================================
 echo  Building Framework-Dependent Versions
-echo  (Requires .NET 8 Runtime, ~200kb each)
+if %DEBUG_MODE%==1 (
+    echo  (Debug Mode - Windows x64 only^)
+) else (
+    echo  (Requires .NET 8 Runtime, ~200kb each^)
+)
 echo ============================================
 echo.
 
@@ -86,6 +99,9 @@ if errorlevel 1 (
     pause
     exit /b 1
 )
+
+:: Skip other platforms in debug mode
+if %DEBUG_MODE%==1 goto :SkipOtherPlatforms
 
 echo [2/4] Building Linux x64 (framework-dependent)...
 dotnet publish SoundbarStandbyHelper.csproj -c Release -r linux-x64 --self-contained false -p:PublishSingleFile=true -o ./publish/linux-x64
@@ -110,6 +126,11 @@ if errorlevel 1 (
     pause
     exit /b 1
 )
+
+:SkipOtherPlatforms
+
+:: Skip packaging in debug mode
+if %DEBUG_MODE%==1 goto :SkipPackaging
 
 echo.
 echo ============================================
@@ -190,6 +211,8 @@ echo Cleaning up temporary build files...
 rd /s /q publish
 echo Deleted publish folder
 
+:SkipPackaging
+
 echo.
 echo ============================================
 echo  Build Summary
@@ -197,30 +220,38 @@ echo ============================================
 echo.
 echo Version: %VERSION%
 echo.
-echo Self-Contained Builds (includes .NET runtime):
-echo   - SoundbarStandbyHelper-v%VERSION%-win-x64-self-contained.zip
-echo   - SoundbarStandbyHelper-v%VERSION%-linux-x64-self-contained.zip
-echo   - SoundbarStandbyHelper-v%VERSION%-osx-x64-self-contained.zip
-echo   - SoundbarStandbyHelper-v%VERSION%-osx-arm64-self-contained.zip
-echo.
-echo Framework-Dependent Builds (requires .NET 8 runtime):
-echo   - SoundbarStandbyHelper-v%VERSION%-win-x64.zip
-echo   - SoundbarStandbyHelper-v%VERSION%-linux-x64.zip
-echo   - SoundbarStandbyHelper-v%VERSION%-osx-x64.zip
-echo   - SoundbarStandbyHelper-v%VERSION%-osx-arm64.zip
-echo.
-echo All release files are in the 'releases' folder.
-echo.
-echo ============================================
-echo  Next Steps
-echo ============================================
-echo.
-echo 1. Test the executables on target platforms
-echo 2. Go to: https://github.com/LbISS/soundbar-standby-helper/releases
-echo 3. Click "Draft a new release"
-echo 4. Create tag: v%VERSION%
-echo 5. Upload files from the 'releases' folder
-echo 6. Add release notes and publish
+if %DEBUG_MODE%==1 (
+    echo Debug Build:
+    echo   - Output directory: publish\win-x64
+    echo.
+    echo Files in output:
+    dir /B publish\win-x64
+) else (
+    echo Self-Contained Builds (includes .NET runtime^):
+    echo   - SoundbarStandbyHelper-v%VERSION%-win-x64-self-contained.zip
+    echo   - SoundbarStandbyHelper-v%VERSION%-linux-x64-self-contained.zip
+    echo   - SoundbarStandbyHelper-v%VERSION%-osx-x64-self-contained.zip
+    echo   - SoundbarStandbyHelper-v%VERSION%-osx-arm64-self-contained.zip
+    echo.
+    echo Framework-Dependent Builds (requires .NET 8 runtime^):
+    echo   - SoundbarStandbyHelper-v%VERSION%-win-x64.zip
+    echo   - SoundbarStandbyHelper-v%VERSION%-linux-x64.zip
+    echo   - SoundbarStandbyHelper-v%VERSION%-osx-x64.zip
+    echo   - SoundbarStandbyHelper-v%VERSION%-osx-arm64.zip
+    echo.
+    echo All release files are in the 'releases' folder.
+    echo.
+    echo ============================================
+    echo  Next Steps
+    echo ============================================
+    echo.
+    echo 1. Test the executables on target platforms
+    echo 2. Go to: https://github.com/LbISS/soundbar-standby-helper/releases
+    echo 3. Click "Draft a new release"
+    echo 4. Create tag: v%VERSION%
+    echo 5. Upload files from the 'releases' folder
+    echo 6. Add release notes and publish
+)
 echo.
 echo ============================================
 
