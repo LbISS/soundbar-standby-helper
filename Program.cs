@@ -2,6 +2,7 @@
 using SoundbarStandbyHelper;
 using SoundbarStandbyHelper.AudioPlayers;
 using SoundbarStandbyHelper.TrayManagers;
+using System.Runtime.InteropServices;
 
 JsonSerializerOptions jsonOptions = new()
 {
@@ -33,7 +34,6 @@ if (config.MinimizeToTray)
 	if (OperatingSystem.IsWindows())
 	{
 		trayManager.Initialize("Sound Timer", "Sound Timer - Running");
-		trayManager.ShowNotification("Sound Timer", "Application is running in system tray.");
 		trayManager.HideConsole();
 	}
 	else
@@ -62,6 +62,9 @@ Program.LogMessage("Exiting...");
 
 void PlaySound(string soundFilePath)
 {
+	if (Program.IsExiting)
+		return;
+
 	try
 	{
 		if (!File.Exists(soundFilePath))
@@ -85,20 +88,67 @@ void PlaySound(string soundFilePath)
 internal partial class Program
 {
 	private static readonly ManualResetEvent _exitEvent = new(false);
+	private static volatile bool _isExiting = false;
+	private static EventHandler? _handler;
 
 	public static ManualResetEvent ExitEvent => _exitEvent;
+	public static bool IsExiting => _isExiting;
+
+	[DllImport("Kernel32")]
+	private static extern bool SetConsoleCtrlHandler(EventHandler handler, bool add);
+
+	private delegate bool EventHandler(CtrlType sig);
+
+	private enum CtrlType
+	{
+		CTRL_C_EVENT = 0,
+		CTRL_BREAK_EVENT = 1,
+		CTRL_CLOSE_EVENT = 2,
+		CTRL_LOGOFF_EVENT = 5,
+		CTRL_SHUTDOWN_EVENT = 6
+	}
 
 	static Program()
 	{
+		// Handle Ctrl+C
 		Console.CancelKeyPress += (sender, e) =>
 		{
 			e.Cancel = true;
 			RequestExit();
 		};
+
+		// Handle window close button (X)
+		if (OperatingSystem.IsWindows())
+		{
+			_handler = new EventHandler(sig =>
+			{
+				if (sig == CtrlType.CTRL_CLOSE_EVENT)
+				{
+					// Close button was clicked - do immediate cleanup on background thread
+					Task.Run(() =>
+					{
+						RequestExit();
+						// Give cleanup 500ms max
+						Thread.Sleep(500);
+						Environment.Exit(0);
+					});
+					return true;
+				}
+
+				RequestExit();
+				return false;
+			});
+
+			SetConsoleCtrlHandler(_handler, true);
+		}
 	}
 
 	public static void RequestExit()
 	{
+		if (_isExiting)
+			return;
+
+		_isExiting = true;
 		_exitEvent.Set();
 	}
 
