@@ -17,7 +17,6 @@ IAudioPlayer audioPlayer;
 try
 {
 	audioPlayer = AudioPlayerFactory.Create();
-	Program.LogMessage($"Audio player initialized: {audioPlayer.GetType().Name}");
 }
 catch (PlatformNotSupportedException ex)
 {
@@ -33,7 +32,7 @@ if (config.MinimizeToTray)
 {
 	if (OperatingSystem.IsWindows())
 	{
-		trayManager.Initialize("Sound Timer", "Sound Timer - Running");
+		trayManager.Initialize("Soundbar Standby Helper", "Soundbar Standby Helper - Running");
 		trayManager.HideConsole();
 	}
 	else
@@ -42,7 +41,7 @@ if (config.MinimizeToTray)
 	}
 }
 
-Program.LogMessage($"Sound Timer Started, the sound will play every {config.DelaySeconds} seconds...");
+Program.LogMessage($"Soundbar Standby Helper Started, the sound will play every {config.DelaySeconds} seconds...");
 Program.LogMessage("Press Ctrl+C to exit.");
 Console.WriteLine();
 
@@ -76,8 +75,6 @@ void PlaySound(string soundFilePath)
 		Program.LogMessage($"Playing sound: {soundFilePath}");
 
 		audioPlayer.PlaySound(soundFilePath);
-
-		Program.LogMessage($"Sound playback completed.");
 	}
 	catch (Exception ex)
 	{

@@ -48,10 +48,39 @@ internal class WindowsTrayManager : ITrayManager
 
 			_notifyIcon = Activator.CreateInstance(notifyIconType);
 
-			var systemIconsType = Type.GetType("System.Drawing.SystemIcons, System.Drawing.Common, Version=8.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51");
-			var applicationIcon = systemIconsType?.GetProperty("Application", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)?.GetValue(null);
+			// Try to load custom icon, fall back to system icon if not found
+			object? icon = null;
+			var iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "standby-helper.ico");
 
-			notifyIconType.GetProperty("Icon")?.SetValue(_notifyIcon, applicationIcon);
+			if (File.Exists(iconPath))
+			{
+				try
+				{
+					var iconType = Type.GetType("System.Drawing.Icon, System.Drawing.Common, Version=8.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51");
+					if (iconType != null)
+					{
+						var iconConstructor = iconType.GetConstructor(new[] { typeof(string) });
+						icon = iconConstructor?.Invoke(new object[] { iconPath });
+					}
+				}
+				catch (Exception ex)
+				{
+					Program.LogMessage($"Warning: Could not load custom icon: {ex.Message}");
+				}
+			}
+			else
+			{
+				Program.LogMessage($"Custom icon not found at: {iconPath}");
+			}
+
+			// Fall back to system icon if custom icon failed to load
+			if (icon == null)
+			{
+				var systemIconsType = Type.GetType("System.Drawing.SystemIcons, System.Drawing.Common, Version=8.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51");
+				icon = systemIconsType?.GetProperty("Application", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)?.GetValue(null);
+			}
+
+			notifyIconType.GetProperty("Icon")?.SetValue(_notifyIcon, icon);
 			notifyIconType.GetProperty("Text")?.SetValue(_notifyIcon, tooltip);
 			notifyIconType.GetProperty("Visible")?.SetValue(_notifyIcon, true);
 
