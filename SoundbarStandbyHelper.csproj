@@ -5,22 +5,48 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    
+    <!-- Version Information -->
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Product>Soundbar Standby Helper</Product>
+    <Copyright>GNU GENERAL PUBLIC LICENSE Version 3</Copyright>
+    <Description>A cross-platform application that prevents soundbars from entering standby mode by periodically playing a sound file.</Description>
+    <PackageIcon>standby-helper.png</PackageIcon>
+    <PackageProjectUrl>https://github.com/LbISS/soundbar-standby-helper/</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/LbISS/soundbar-standby-helper/</RepositoryUrl>
+    
+    <!-- Hide build output folders from Solution Explorer -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);publish\**;releases\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="System.Windows.Extensions" Version="8.0.0" />
   </ItemGroup>
 
-  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
-    <FrameworkReference Include="Microsoft.WindowsDesktop.App.WindowsForms" />
+  <!-- Windows Forms reference only for Windows runtime builds -->
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'win-x64' OR '$(RuntimeIdentifier)' == 'win-x86' OR '$(RuntimeIdentifier)' == 'win-arm64' OR '$(RuntimeIdentifier)' == ''">
+    <FrameworkReference Include="Microsoft.WindowsDesktop.App.WindowsForms" Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
     <None Update="sound.wav">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="standby-helper.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="config.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="standby-helper.png">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
     </None>
   </ItemGroup>
 
