@@ -1,5 +1,4 @@
 using System.Runtime.InteropServices;
-using System.Threading;
 
 namespace SoundbarStandbyHelper.TrayManagers;
 
@@ -10,6 +9,8 @@ internal class WindowsTrayManager : ITrayManager
 	private bool _disposed;
 	private Thread? _messageLoopThread;
 	private object? _applicationContext;
+	private Thread? _windowWatchThread;
+	private volatile bool _shouldMonitorWindow;
 
 	public void Initialize(string title, string tooltip)
 	{
@@ -30,7 +31,7 @@ internal class WindowsTrayManager : ITrayManager
 		{
 			var applicationType = Type.GetType("System.Windows.Forms.Application, System.Windows.Forms, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089");
 			var applicationContextType = Type.GetType("System.Windows.Forms.ApplicationContext, System.Windows.Forms, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089");
-			
+
 			if (applicationType == null || applicationContextType == null)
 			{
 				Program.LogMessage("Warning: Windows Forms types not available.");
@@ -46,20 +47,20 @@ internal class WindowsTrayManager : ITrayManager
 			}
 
 			_notifyIcon = Activator.CreateInstance(notifyIconType);
-			
+
 			var systemIconsType = Type.GetType("System.Drawing.SystemIcons, System.Drawing.Common, Version=8.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51");
 			var applicationIcon = systemIconsType?.GetProperty("Application", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)?.GetValue(null);
-			
+
 			notifyIconType.GetProperty("Icon")?.SetValue(_notifyIcon, applicationIcon);
 			notifyIconType.GetProperty("Text")?.SetValue(_notifyIcon, tooltip);
 			notifyIconType.GetProperty("Visible")?.SetValue(_notifyIcon, true);
 
 			var contextMenuStripType = Type.GetType("System.Windows.Forms.ContextMenuStrip, System.Windows.Forms, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089");
 			var contextMenu = Activator.CreateInstance(contextMenuStripType!);
-			
+
 			var itemsProperty = contextMenuStripType!.GetProperty("Items");
 			var items = itemsProperty?.GetValue(contextMenu);
-			
+
 			if (items != null)
 			{
 				var addMethod = items.GetType().GetMethod("Add", new[] { typeof(string), typeof(object), typeof(EventHandler) });
@@ -99,11 +100,31 @@ internal class WindowsTrayManager : ITrayManager
 
 		// Give the thread time to initialize
 		Thread.Sleep(100);
+
+		// Start window monitoring thread
+		StartWindowMonitoring();
 	}
 
-	public void OnMouseDoubleClick(object? sender, object? e)
+	private void StartWindowMonitoring()
 	{
-		ShowConsoleWindow();
+		_shouldMonitorWindow = true;
+		_windowWatchThread = new Thread(() =>
+		{
+			while (_shouldMonitorWindow)
+			{
+				if (_consoleWindow != IntPtr.Zero)
+				{
+					if (IsIconic(_consoleWindow))
+					{
+						// Window is minimized, hide it
+						HideConsoleWindowInternal();
+					}
+				}
+				Thread.Sleep(250); // Check every 250ms
+			}
+		});
+		_windowWatchThread.IsBackground = true;
+		_windowWatchThread.Start();
 	}
 
 	[DllImport("kernel32.dll")]
@@ -118,8 +139,10 @@ internal class WindowsTrayManager : ITrayManager
 	[DllImport("user32.dll")]
 	private static extern bool BringWindowToTop(IntPtr hWnd);
 
+	[DllImport("user32.dll")]
+	private static extern bool IsIconic(IntPtr hWnd);
+
 	private const int SW_HIDE = 0;
-	private const int SW_SHOW = 5;
 	private const int SW_RESTORE = 9;
 
 	public void HideConsole()
@@ -148,28 +171,20 @@ internal class WindowsTrayManager : ITrayManager
 		}
 	}
 
-	public void ShowNotification(string title, string message)
-	{
-		if (!OperatingSystem.IsWindows() || _notifyIcon == null)
-			return;
-
-		var notifyIconType = _notifyIcon.GetType();
-		var showBalloonTipMethod = notifyIconType.GetMethod("ShowBalloonTip", new[] { typeof(int), typeof(string), typeof(string), typeof(int) });
-		showBalloonTipMethod?.Invoke(_notifyIcon, new object[] { 3000, title, message, 1 }); // 1 = ToolTipIcon.Info
-	}
-
 	public void Dispose()
 	{
 		if (_disposed)
 			return;
 
+		_shouldMonitorWindow = false;
+
 		if (_notifyIcon != null && OperatingSystem.IsWindows())
 		{
 			ShowConsoleWindow();
-			
+
 			var notifyIconType = _notifyIcon.GetType();
 			notifyIconType.GetProperty("Visible")?.SetValue(_notifyIcon, false);
-			
+
 			var disposeMethod = notifyIconType.GetMethod("Dispose");
 			disposeMethod?.Invoke(_notifyIcon, null);
 		}
