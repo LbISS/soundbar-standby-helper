@@ -1,4 +1,4 @@
-﻿# SoundbarStandbyHelper
+﻿# Soundbar Standby Helper
 
 A cross-platform .NET application that prevents soundbars from entering standby mode by periodically playing a sound file.
 
@@ -163,6 +163,7 @@ sudo apt-get install alsa-utils
 ### Application doesn't prevent standby
 - Reduce `DelaySeconds` value (try 300 seconds / 5 minutes)
 - Ensure your audio output device is set correctly
+- Make .wav sound a little bit louder
 - Verify the sound is actually playing (check logs)
 
 ## License
