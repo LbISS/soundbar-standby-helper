@@ -37,9 +37,20 @@ internal class WindowsStartupManager : IStartupManager
 			if (string.IsNullOrEmpty(exePath))
 				return;
 
+			var exeDir = Path.GetDirectoryName(exePath);
+			if (string.IsNullOrEmpty(exeDir))
+				return;
+
+			// Use cmd /c to set working directory before starting the app
+			// This ensures config.json and other files are found in the app directory
+			var command = $"cmd /c cd /d \"{exeDir}\" && \"{exePath}\"";
+
 			using var key = Registry.CurrentUser.OpenSubKey(RunKey, true);
-			key?.SetValue(AppName, $"\"{exePath}\"");
-			
+			key?.SetValue(AppName, command);
+
+			// Save to config
+			SaveStartupStateToConfig(true);
+
 			Program.LogMessage("Startup enabled: Application will start with Windows");
 		}
 		catch (Exception ex)
@@ -57,7 +68,10 @@ internal class WindowsStartupManager : IStartupManager
 		{
 			using var key = Registry.CurrentUser.OpenSubKey(RunKey, true);
 			key?.DeleteValue(AppName, false);
-			
+
+			// Save to config
+			SaveStartupStateToConfig(false);
+
 			Program.LogMessage("Startup disabled: Application will not start with Windows");
 		}
 		catch (Exception ex)
@@ -75,6 +89,20 @@ internal class WindowsStartupManager : IStartupManager
 		else
 		{
 			EnableStartup();
+		}
+	}
+
+	private void SaveStartupStateToConfig(bool enabled)
+	{
+		try
+		{
+			var config = ConfigManager.Load("config.json");
+			config.StartWithSystem = enabled;
+			ConfigManager.Save("config.json", config);
+		}
+		catch (Exception ex)
+		{
+			Program.LogMessage($"Warning: Could not save startup state to config: {ex.Message}");
 		}
 	}
 }

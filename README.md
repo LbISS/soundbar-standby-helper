@@ -70,7 +70,8 @@ The application uses a `config.json` file for configuration. If the file doesn't
 {
   "SoundFilePath": "sound.wav",
   "MinimizeToTray": true,
-  "DelaySeconds": 540
+  "DelaySeconds": 540,
+  "StartWithSystem": false
 }
 ```
 
@@ -81,6 +82,7 @@ The application uses a `config.json` file for configuration. If the file doesn't
 | `SoundFilePath` | string | `"sound.wav"` | Relative or absolute path to the `.wav` file to play. The file should be in the same folder as the executable by default. |
 | `MinimizeToTray` | boolean | `true` | **Windows only**: When `true`, the application minimizes to the system tray. On Linux/macOS, this setting is ignored and the app runs in console mode. |
 | `DelaySeconds` | integer | `540` | Number of seconds between sound playbacks. Default is 540 seconds (9 minutes), which is suitable for most EU soundbars that enter standby after 10 minutes. |
+| `StartWithSystem` | boolean | `false` | Start the application automatically when you log in (startup). |
 
 
 ## Running as a Service/Startup Application

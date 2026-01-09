@@ -13,6 +13,7 @@ JsonSerializerOptions jsonOptions = new()
 var configPath = "config.json";
 
 var config = ConfigManager.Load(configPath);
+Program.LogMessage($"Config has been loaded:" + JsonSerializer.Serialize(config, jsonOptions));
 
 IAudioPlayer audioPlayer;
 try
@@ -58,7 +59,7 @@ if (config.MinimizeToTray)
 	}
 }
 
-Program.LogMessage($"Soundbar Standby Helper Started, the sound will play every {config.DelaySeconds} seconds...");
+Program.LogMessage($"Soundbar Standby Helper Started");
 Program.LogMessage("Press Ctrl+C to exit.");
 Console.WriteLine();
 

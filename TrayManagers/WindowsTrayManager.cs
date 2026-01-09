@@ -130,10 +130,6 @@ internal class WindowsTrayManager : ITrayManager
 						startupClickEvent?.AddEventHandler(startupMenuItem, new EventHandler((s, e) =>
 						{
 							_startupManager?.ToggleStartup();
-							// Update config
-							var config = ConfigManager.Load("config.json");
-							config.StartWithSystem = _startupManager?.IsStartupEnabled() ?? false;
-							ConfigManager.Save("config.json", config);
 						}));
 						addMethod?.Invoke(items, new[] { startupMenuItem });
 					}
