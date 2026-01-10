@@ -18,7 +18,7 @@ Many soundbars, especially those sold in the EU market, automatically enter stan
 - ✅ **Cross-platform**: Runs on Windows, Linux, and macOS
 - ✅ **Configurable**: Customize sound file, playback interval, and behavior via JSON config
 - ✅ **System Tray Support**: Minimize to tray on Windows (optional)
-  <img width="157" height="114" alt="image" src="https://github.com/user-attachments/assets/4d46cb0a-6b29-4a62-8b40-a94bb7d5eeb2" />
+<img width="157" height="114" alt="image" src="https://github.com/user-attachments/assets/4d46cb0a-6b29-4a62-8b40-a94bb7d5eeb2" />
 
 
 ## Requirements
