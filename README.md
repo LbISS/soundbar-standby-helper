@@ -22,14 +22,15 @@ Many soundbars, especially those sold in the EU market, automatically enter stan
 ## Requirements
 
 - [.NET 8 Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) (or build as self-contained)
-- A `.wav` sound file (a default silent/quiet sound file is recommended)
+- A `.wav` sound file (a quiet low-frequency and short sound file is recommended)
 
 ## Installation
 
 ### Option 1: Download Pre-built Release
-1. Download the latest release for your platform from the [Releases](../../releases) page
-2. Extract the archive to a folder of your choice
-3. Run the executable
+**Note**: You may download normal binaries if you have .net runtime installed (typical case) or self-contained binaries. Self-contained builds include the .NET runtime, resulting in larger executables (~70MB) but require no .Net runtime installation on the target machine.
+1. Download the latest release for your platform from the [Releases](../../releases) page.
+3. Extract the archive to a folder of your choice
+4. Run the executable
 
 ### Option 2: Build from Source
 ```bash
@@ -37,28 +38,34 @@ Many soundbars, especially those sold in the EU market, automatically enter stan
 git clone https://github.com/LbISS/soundbar-standby-helper.git
 cd soundbar-standby-helper
 
-# Build the application
-dotnet build -c Release
+# Publish the application in mainstream way
+# Windows x64
+dotnet publish SoundbarStandbyHelper.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o ./publish/win-x64
+
+# Linux x64
+dotnet publish SoundbarStandbyHelper.csproj -c Release -r linux-x64 --self-contained false -p:PublishSingleFile=true -o ./publish/linux-x64
+
+# macOS x64 (Intel)
+dotnet publish SoundbarStandbyHelper.csproj -c Release -r osx-x64 --self-contained false -p:PublishSingleFile=true -o ./publish/osx-x64
+
+# macOS ARM64 (Apple Silicon M1/M2/M3)
+dotnet publish SoundbarStandbyHelper.csproj -c Release -r osx-arm64 --self-contained false -p:PublishSingleFile=true -o ./publish/osx-arm64
 
 # Or publish as self-contained (no .NET runtime required)
 # Windows x64
-dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true
+dotnet publish SoundbarStandbyHelper.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o ./publish/win-x64-self-contained
 
 # Linux x64
-dotnet publish -c Release -r linux-x64 --self-contained -p:PublishSingleFile=true
+dotnet publish SoundbarStandbyHelper.csproj -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o ./publish/linux-x64-self-contained
 
 # macOS x64 (Intel)
-dotnet publish -c Release -r osx-x64 --self-contained -p:PublishSingleFile=true
+dotnet publish SoundbarStandbyHelper.csproj -c Release -r osx-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o ./publish/osx-x64-self-contained
 
 # macOS ARM64 (Apple Silicon M1/M2/M3)
-dotnet publish -c Release -r osx-arm64 --self-contained -p:PublishSingleFile=true
+dotnet publish SoundbarStandbyHelper.csproj -c Release -r osx-arm64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o ./publish/osx-arm64-self-contained
 ```
 
-**Note**: Self-contained builds include the .NET runtime, resulting in larger executables (~70MB) but require no runtime installation on the target machine.
-
-The compiled output will be in:
-- Framework-dependent: `bin/Release/net8.0/`
-- Self-contained: `bin/Release/net8.0/{runtime-identifier}/publish/`
+The compiled output will be in: `publish/`
 
 ## Configuration
 
